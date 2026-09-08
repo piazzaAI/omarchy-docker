@@ -1,0 +1,88 @@
+#!/bin/bash
+# Run one Compose action against one stack and report the outcome as JSON.
+# Usable straight from a keybinding: omarchy-docker-action up hades --notify
+
+set -o pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=docker-lib.sh
+source "$SCRIPT_DIR/docker-lib.sh"
+
+ROOTS="$DEFAULT_ROOTS"
+NOTIFY=0
+ACTION=""
+NAME=""
+
+usage() {
+  cat <<USAGE
+Usage: omarchy-docker-action <action> <stack> [--roots dirs] [--notify]
+
+Actions:
+  up        docker compose up -d
+  down      docker compose down
+  restart   docker compose restart
+  build     docker compose build
+  rebuild   docker compose up -d --build --force-recreate
+  logs      open a floating terminal following the stack's logs
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --roots) ROOTS="${2:-}"; shift 2 ;;
+    --notify) NOTIFY=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    -*) die "unknown argument: $1" ;;
+    *)
+      if [[ -z $ACTION ]]; then ACTION="$1"
+      elif [[ -z $NAME ]]; then NAME="$1"
+      else die "unexpected argument: $1"; fi
+      shift ;;
+  esac
+done
+
+[[ -n $ACTION && -n $NAME ]] || { usage >&2; die "action and stack are required"; }
+command -v jq >/dev/null 2>&1 || die "jq is not installed"
+have_docker || die "Docker is not running"
+
+mapfile -t COMPOSE < <(compose_args "$NAME" "$ROOTS")
+((${#COMPOSE[@]})) || die "unknown stack: $NAME"
+
+notify() {
+  ((NOTIFY)) || return 0
+  omarchy-notification-send -g "󰡨" "$1" "$2" >/dev/null 2>&1 || true
+}
+
+case "$ACTION" in
+  up)      ARGS=(up -d) ;;
+  down)    ARGS=(down) ;;
+  restart) ARGS=(restart) ;;
+  build)   ARGS=(build) ;;
+  rebuild) ARGS=(up -d --build --force-recreate) ;;
+  logs)
+    setsid omarchy-launch-floating-terminal-with-presentation \
+      "docker compose ${COMPOSE[*]} logs -f --tail=200" >/dev/null 2>&1 &
+    jq -n --arg action logs --arg stack "$NAME" '{ok: true, action: $action, stack: $stack}'
+    exit 0 ;;
+  *) die "unknown action: $ACTION" ;;
+esac
+
+# Compose writes its progress to stderr; only the tail is worth carrying back,
+# and only when it failed.
+err=$(mktemp)
+trap 'rm -f "$err"' EXIT
+
+if docker compose "${COMPOSE[@]}" "${ARGS[@]}" >/dev/null 2>"$err"; then
+  notify "$NAME" "$ACTION finished"
+  jq -n --arg action "$ACTION" --arg stack "$NAME" '{ok: true, action: $action, stack: $stack}'
+  exit 0
+else
+  code=$?
+fi
+
+detail=$(tail -n 5 "$err" | tr -d '\r')
+[[ -n $detail ]] || detail="docker compose $ACTION exited with $code"
+notify "$NAME failed" "$detail"
+jq -n --arg action "$ACTION" --arg stack "$NAME" --arg error "$detail" \
+  '{ok: false, action: $action, stack: $stack, error: $error}'
+exit 1

@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "id": "piazza.docker",
+  "name": "Docker",
+  "version": "0.1.0",
+  "author": "piazza",
+  "license": "MIT",
+  "description": "Bring Docker Compose stacks up, down, build and rebuild them from the status bar.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "activation": "on-demand",
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Docker",
+    "description": "Lists every Compose stack the daemon knows plus every one found on disk. Left click opens the panel; each row carries up, down, restart, build, rebuild and logs.",
+    "category": "Development",
+    "aliases": [
+      "docker",
+      "compose",
+      "containers",
+      "stacks"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "roots": "~/dev",
+      "refreshIntervalSec": 10,
+      "hideIdle": false,
+      "showCount": true
+    },
+    "schema": [
+      {
+        "key": "roots",
+        "type": "string",
+        "label": "Project folders",
+        "defaultValue": "~/dev",
+        "description": "Comma-separated folders scanned one level deep for compose files, so a stack that has never been started still shows up."
+      },
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 3,
+        "max": 600,
+        "step": 1,
+        "defaultValue": 10
+      },
+      {
+        "key": "hideIdle",
+        "type": "boolean",
+        "label": "Hide stacks that have never been started",
+        "defaultValue": false,
+        "description": "Keeps the list to what the daemon already knows about."
+      },
+      {
+        "key": "showCount",
+        "type": "boolean",
+        "label": "Show the running stack count on the bar",
+        "defaultValue": true
+      }
+    ]
+  }
+}
