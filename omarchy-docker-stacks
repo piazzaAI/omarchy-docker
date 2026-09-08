@@ -1,0 +1,32 @@
+#!/bin/bash
+# List every Compose stack the daemon knows plus every one found on disk, as
+# JSON, for the piazza.docker bar widget (and anything else that wants it).
+
+set -o pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=docker-lib.sh
+source "$SCRIPT_DIR/docker-lib.sh"
+
+ROOTS="$DEFAULT_ROOTS"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --roots) ROOTS="${2:-}"; shift 2 ;;
+    -h|--help)
+      cat <<USAGE
+Usage: omarchy-docker-stacks [--roots dir1,dir2]
+
+Prints {"ok":true,"stacks":[…]} — name, state, running/total containers,
+compose files and project directory for every stack found.
+USAGE
+      exit 0 ;;
+    *) die "unknown argument: $1" ;;
+  esac
+done
+
+command -v jq >/dev/null 2>&1 || die "jq is not installed"
+have_docker || die "Docker is not running"
+
+stacks=$(stacks_json "$ROOTS") || die "could not list stacks"
+jq -n --argjson stacks "$stacks" '{ok: true, stacks: $stacks}'
