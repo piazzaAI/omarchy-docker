@@ -329,7 +329,7 @@ Panel {
     open: root.opened
     focusTarget: keyCatcher
     padding: 0
-    contentWidth: panel.fittedContentWidth(Style.space(460))
+    contentWidth: panel.fittedContentWidth(Style.space(620))
     contentHeight: panel.fittedContentHeight(Style.space(360), Style.space(560))
 
     PanelKeyCatcher {
@@ -467,13 +467,20 @@ Panel {
             }
           }
 
-          Row {
+          // The name is bounded by the action lane rather than free to run
+          // under it, and elides when a long project name meets a narrow bar.
+          Item {
+            id: info
             anchors.left: parent.left
             anchors.leftMargin: Style.space(20)
+            anchors.right: actions.left
+            anchors.rightMargin: Style.space(12)
             anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(11)
+            height: infoColumn.implicitHeight
 
             Rectangle {
+              id: dot
+              anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               width: Style.space(8)
               height: Style.space(8)
@@ -490,10 +497,15 @@ Panel {
             }
 
             Column {
-              anchors.verticalCenter: parent.verticalCenter
+              id: infoColumn
+              anchors.left: dot.right
+              anchors.leftMargin: Style.space(11)
+              anchors.right: parent.right
               spacing: Style.space(2)
 
               Text {
+                width: parent.width
+                elide: Text.ElideRight
                 textFormat: Text.PlainText
                 text: row.modelData.name
                 color: row.selected ? root.foreground : root.body
@@ -502,6 +514,8 @@ Panel {
               }
 
               Text {
+                width: parent.width
+                elide: Text.ElideRight
                 textFormat: Text.PlainText
                 text: row.rowBusy ? row.runningAction + "…" : Model.stateLabel(row.modelData)
                 color: row.rowBusy ? root.accent : root.dim
@@ -511,43 +525,47 @@ Panel {
             }
           }
 
-          // The actions ride on the selected row only: six buttons on every line
-          // is a wall, and the selection follows the pointer anyway.
+          // The lane is always laid out, and only its paint and input follow the
+          // selection. Showing it with `visible` would hand the width back to the
+          // name on every unselected row, so the text would jump on each move.
           Row {
+            id: actions
             anchors.right: parent.right
             anchors.rightMargin: Style.space(18)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(5)
-            visible: row.selected && !row.rowBusy
+            opacity: row.selected && !row.rowBusy ? 1 : 0
+            enabled: row.selected && !row.rowBusy
 
             Repeater {
               model: Model.actions()
 
               delegate: Rectangle {
+                id: actionButton
                 required property var modelData
-                readonly property bool enabled: Model.actionEnabled(modelData, row.modelData)
+                readonly property bool available: Model.actionEnabled(modelData, row.modelData)
 
                 width: actionLabel.implicitWidth + Style.space(16)
                 height: Style.space(24)
                 radius: Style.space(6)
-                color: actionHover.hovered && enabled ? root.selectedBg : root.recessed
+                enabled: actionButton.available
+                color: actionHover.hovered ? root.selectedBg : root.recessed
                 border.width: 1
-                border.color: actionHover.hovered && enabled
+                border.color: actionHover.hovered
                   ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.5) : root.line
-                opacity: enabled ? 1 : 0.35
+                opacity: actionButton.available ? 1 : 0.35
 
-                HoverHandler { id: actionHover; enabled: parent.enabled }
+                HoverHandler { id: actionHover }
                 TapHandler {
-                  enabled: parent.enabled
-                  onTapped: root.run(row.modelData.name, parent.modelData.action)
+                  onTapped: root.run(row.modelData.name, actionButton.modelData.action)
                 }
 
                 Text {
                   id: actionLabel
                   anchors.centerIn: parent
                   textFormat: Text.PlainText
-                  text: parent.modelData.label
-                  color: actionHover.hovered && parent.enabled ? root.accent : root.body
+                  text: actionButton.modelData.label
+                  color: actionHover.hovered ? root.accent : root.body
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
                 }
