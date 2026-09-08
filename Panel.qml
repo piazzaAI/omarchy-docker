@@ -329,7 +329,7 @@ Panel {
     open: root.opened
     focusTarget: keyCatcher
     padding: 0
-    contentWidth: panel.fittedContentWidth(Style.space(620))
+    contentWidth: panel.fittedContentWidth(Style.space(700))
     contentHeight: panel.fittedContentHeight(Style.space(360), Style.space(560))
 
     PanelKeyCatcher {
